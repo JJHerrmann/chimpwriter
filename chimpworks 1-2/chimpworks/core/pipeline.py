@@ -13,6 +13,7 @@ from pathlib import Path
 from ..log import Progress, get_logger, noop_progress
 from ..models import SourceMeta, Transcript
 from . import asr, audio, diarize as diar
+from .cleanup import CleanupOptions, clean_segments
 from .lexicon import Lexicon, load_lexicon
 from .sources import fetch_audio, probe_metadata, resolve_source
 
@@ -32,6 +33,11 @@ class TranscribeOptions:
     cookies_from_browser: str = ""
     # terminology library: "" -> default lexicon.toml, None -> disabled
     lexicon_path: str | None = ""
+    # LLM cleanup stage (STT -> lexicon -> cleanup -> final)
+    cleanup: bool = False
+    cleanup_endpoint: str = "http://localhost:11434/v1"
+    cleanup_model: str = ""
+    cleanup_max_chars: int = 4000
 
 
 def build_transcript(
@@ -85,6 +91,22 @@ def build_transcript(
                     w.word = lex.apply(w.word)
             if n:
                 log.info("lexicon: applied fixes to %d segment(s)", n)
+
+        if opts.cleanup:
+            try:
+                clean_segments(
+                    segments,
+                    CleanupOptions(
+                        enabled=True,
+                        endpoint=opts.cleanup_endpoint,
+                        model=opts.cleanup_model,
+                        max_chars=opts.cleanup_max_chars,
+                        glossary=lex.terms,
+                    ),
+                    progress=progress,
+                )
+            except Exception as exc:  # noqa: BLE001 - cleanup is best-effort
+                log.warning("cleanup failed: %s", exc)
 
         turns = []
         if opts.diarize:

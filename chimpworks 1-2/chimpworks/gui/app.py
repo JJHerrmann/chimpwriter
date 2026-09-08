@@ -89,6 +89,13 @@ class SettingsDialog(QtWidgets.QDialog):
             "pyannote/speaker-diarization-3.1  or  a local pipeline path"
         )
         form.addRow("Diarization model", self.diar_model_edit)
+
+        self.cleanup_endpoint_edit = QtWidgets.QLineEdit()
+        self.cleanup_endpoint_edit.setPlaceholderText("http://localhost:11434/v1")
+        self.cleanup_model_edit = QtWidgets.QLineEdit()
+        self.cleanup_model_edit.setPlaceholderText("qwen2.5:7b-instruct  (OpenAI-compatible)")
+        form.addRow("Cleanup endpoint", self.cleanup_endpoint_edit)
+        form.addRow("Cleanup model", self.cleanup_model_edit)
         lay.addLayout(form)
 
         # --- Hugging Face token group ---
@@ -154,6 +161,8 @@ class SettingsDialog(QtWidgets.QDialog):
 
     def _load(self) -> None:
         self.diar_model_edit.setText(self.prefs.diarize_model)
+        self.cleanup_endpoint_edit.setText(self.prefs.cleanup_endpoint)
+        self.cleanup_model_edit.setText(self.prefs.cleanup_model)
         self.token_edit.setText(hfsecrets.load_token())
 
     def _test_token(self) -> None:
@@ -178,6 +187,10 @@ class SettingsDialog(QtWidgets.QDialog):
         self.prefs.diarize_model = (
             self.diar_model_edit.text().strip() or "pyannote/speaker-diarization-3.1"
         )
+        self.prefs.cleanup_endpoint = (
+            self.cleanup_endpoint_edit.text().strip() or "http://localhost:11434/v1"
+        )
+        self.prefs.cleanup_model = self.cleanup_model_edit.text().strip()
         where = hfsecrets.save_token(self.token_edit.text().strip())
         self.storage_hint.setText(f"Stored in: {where}")
         save_prefs(self.prefs)
@@ -248,9 +261,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.diar_check = QtWidgets.QCheckBox("Multi-speaker (diarize)")
         self.diar_check.toggled.connect(self._refresh_token_banner)
+        self.cleanup_check = QtWidgets.QCheckBox("Clean up with LLM (fix names / jargon / punctuation)")
         self.article_check = QtWidgets.QCheckBox("Readable article (strip filler)")
         self.cite_check = QtWidgets.QCheckBox("APA citation")
         v.addWidget(self.diar_check)
+        v.addWidget(self.cleanup_check)
         v.addWidget(self.article_check)
         v.addWidget(self.cite_check)
 
@@ -303,6 +318,7 @@ class MainWindow(QtWidgets.QMainWindow):
         idx = self.speed_combo.findData(p.model)
         self.speed_combo.setCurrentIndex(idx if idx >= 0 else 1)
         self.diar_check.setChecked(p.diarize)
+        self.cleanup_check.setChecked(p.cleanup)
         self.article_check.setChecked(p.make_article)
         self.cite_check.setChecked(p.make_citation)
 
@@ -314,6 +330,7 @@ class MainWindow(QtWidgets.QMainWindow):
         p.language = self.lang_combo.currentText().strip() or "auto"
         p.model = self.speed_combo.currentData()
         p.diarize = self.diar_check.isChecked()
+        p.cleanup = self.cleanup_check.isChecked()
         p.make_article = self.article_check.isChecked()
         p.make_citation = self.cite_check.isChecked()
         save_prefs(p)
@@ -374,6 +391,10 @@ class MainWindow(QtWidgets.QMainWindow):
             diarize_model=self.prefs.diarize_model,
             hf_token=hfsecrets.load_token(),
             cookies_from_browser=cfg.yt_cookies_from_browser,
+            cleanup=self.prefs.cleanup,
+            cleanup_endpoint=self.prefs.cleanup_endpoint or cfg.cleanup_endpoint,
+            cleanup_model=self.prefs.cleanup_model or cfg.cleanup_model,
+            cleanup_max_chars=cfg.cleanup_max_chars,
         )
         p_opts = PacketOptions(
             topic=self.prefs.topic,

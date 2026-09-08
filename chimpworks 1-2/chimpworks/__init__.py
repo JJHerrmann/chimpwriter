@@ -9,4 +9,4 @@ The v1 GUI logic lived tangled inside ``app/transcribe.py`` behind a Qt
 it runs from the CLI, from tests, and from the v1.3 GUI shell (``chimpworks.gui``).
 """
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"

@@ -53,6 +53,10 @@ class Config:
     diarize_model: str = "pyannote/speaker-diarization-3.1"
     yt_cookies_from_browser: str = ""        # e.g. "firefox" - passed to yt-dlp
     lexicon: str = ""                        # "" => <config>/lexicon.toml
+    cleanup: bool = False                    # LLM terminology-aware cleanup pass
+    cleanup_endpoint: str = "http://localhost:11434/v1"   # OpenAI-compatible
+    cleanup_model: str = ""                  # e.g. "qwen2.5:7b-instruct"
+    cleanup_max_chars: int = 4000
     source_path: str | None = None
 
     def resolved_output_dir(self) -> Path:

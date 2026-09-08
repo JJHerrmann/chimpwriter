@@ -52,6 +52,9 @@ def _transcribe_opts(args, cfg) -> TranscribeOptions:
         lexicon_path: str | None = None
     else:
         lexicon_path = getattr(args, "terms", None) or cfg.lexicon or ""
+    cleanup = cfg.cleanup or getattr(args, "cleanup", False)
+    if getattr(args, "no_cleanup", False):
+        cleanup = False
     return TranscribeOptions(
         model=resolve_model(args.model or cfg.model),
         language=args.language or cfg.language,
@@ -63,6 +66,10 @@ def _transcribe_opts(args, cfg) -> TranscribeOptions:
         hf_token=hf_token(),
         cookies_from_browser=cfg.yt_cookies_from_browser,
         lexicon_path=lexicon_path,
+        cleanup=cleanup,
+        cleanup_endpoint=getattr(args, "cleanup_endpoint", None) or cfg.cleanup_endpoint,
+        cleanup_model=getattr(args, "cleanup_model", None) or cfg.cleanup_model,
+        cleanup_max_chars=cfg.cleanup_max_chars,
     )
 
 
@@ -117,6 +124,43 @@ def cmd_render(args) -> int:
     out_root = Path(args.out).expanduser() if args.out else Path(args.transcript).resolve().parents[3]
     written = write_packet(transcript, out_root, _packet_opts(args, cfg))
     for p in written:
+        print(p)
+    return 0
+
+
+def cmd_cleanup(args) -> int:
+    """Run the LLM cleanup pass on an existing transcript.json, in place + re-render."""
+    from .core.cleanup import CleanupOptions, clean_segments
+    from .core.lexicon import load_lexicon
+
+    cfg = load_config(args.config)
+    tpath = Path(args.transcript).expanduser()
+    transcript = Transcript.load(tpath)
+
+    lex = load_lexicon(None if args.no_terms else (args.terms or cfg.lexicon or ""))
+    opts = CleanupOptions(
+        enabled=True,
+        endpoint=args.cleanup_endpoint or cfg.cleanup_endpoint,
+        model=args.cleanup_model or cfg.cleanup_model,
+        max_chars=cfg.cleanup_max_chars,
+        glossary=lex.terms,
+    )
+    ok, why = opts.ready()
+    if not ok:
+        log.error("cleanup: %s", why)
+        return 1
+
+    changed = clean_segments(transcript.segments, opts, progress=_progress)
+    transcript.save(tpath)
+    print(f"{changed} segment(s) changed -> {tpath}")
+
+    if args.out:
+        out_root = Path(args.out).expanduser()
+    else:
+        parents = tpath.resolve().parents
+        # packet lives at <root>/Research/<topic>/<name>/x.transcript.json
+        out_root = parents[3] if len(parents) > 3 else tpath.resolve().parent
+    for p in write_packet(transcript, out_root, _packet_opts(args, cfg)):
         print(p)
     return 0
 
@@ -205,6 +249,10 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--diarize", action="store_true")
         sp.add_argument("--terms", metavar="PATH", help="terminology lexicon (default: <config>/lexicon.toml)")
         sp.add_argument("--no-terms", action="store_true", help="ignore the terminology lexicon")
+        sp.add_argument("--cleanup", action="store_true", help="LLM terminology-aware cleanup pass")
+        sp.add_argument("--no-cleanup", action="store_true", help="skip the cleanup pass")
+        sp.add_argument("--cleanup-model", metavar="NAME", help="model for the cleanup pass")
+        sp.add_argument("--cleanup-endpoint", metavar="URL", help="OpenAI-compatible endpoint for cleanup")
 
     t = sub.add_parser("transcribe", help="one URL or file -> research packet")
     t.add_argument("input")
@@ -222,6 +270,15 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("transcript")
     add_render_opts(r)
     r.set_defaults(func=cmd_render)
+
+    cl = sub.add_parser("cleanup", help="LLM cleanup pass on an existing transcript.json (in place)")
+    cl.add_argument("transcript")
+    cl.add_argument("--cleanup-model", metavar="NAME")
+    cl.add_argument("--cleanup-endpoint", metavar="URL")
+    cl.add_argument("--terms", metavar="PATH")
+    cl.add_argument("--no-terms", action="store_true")
+    add_render_opts(cl)
+    cl.set_defaults(func=cmd_cleanup)
 
     d = sub.add_parser("doctor", help="check optional dependencies")
     d.set_defaults(func=cmd_doctor)

@@ -23,5 +23,17 @@ digest = "heuristic"      # heuristic | off  (LLM backend is a later phase)
 diarize = false
 diarize_model = "pyannote/speaker-diarization-3.1"   # or an absolute local path
 
+# Terminology library (hotwords + text fixes). "" => <config>/lexicon.toml
+lexicon = ""
+
+# Second stage: LLM terminology-aware cleanup (STT -> lexicon -> cleanup).
+# Corrects only obvious transcription errors (names, jargon, homophones,
+# punctuation) against the lexicon's `terms` as a glossary. OpenAI-compatible
+# endpoint; set CHIMPWORKS_LLM_API_KEY for hosted ones. Off unless a model is set.
+cleanup = false
+cleanup_endpoint = "http://localhost:11434/v1"
+cleanup_model = ""            # e.g. "qwen2.5:7b-instruct"
+cleanup_max_chars = 4000
+
 # pass-through to yt-dlp --cookies-from-browser, e.g. "firefox", "chrome"
 yt_cookies_from_browser = ""

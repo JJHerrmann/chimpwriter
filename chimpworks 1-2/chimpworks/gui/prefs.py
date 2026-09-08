@@ -29,6 +29,9 @@ class GuiPrefs:
     make_article: bool = False
     make_citation: bool = True
     diarize_model: str = "pyannote/speaker-diarization-3.1"
+    cleanup: bool = False
+    cleanup_endpoint: str = "http://localhost:11434/v1"
+    cleanup_model: str = ""
     last_input: str = ""
 
     def speed_label(self) -> str:
@@ -46,6 +49,9 @@ def load_prefs() -> GuiPrefs:
         make_article=cfg.make_article,
         make_citation=cfg.make_citation,
         diarize_model=cfg.diarize_model,
+        cleanup=cfg.cleanup,
+        cleanup_endpoint=cfg.cleanup_endpoint,
+        cleanup_model=cfg.cleanup_model,
     )
     if PREFS_FILE.exists():
         try:

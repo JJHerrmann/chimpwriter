@@ -98,6 +98,34 @@ chimpworks transcribe ... --no-terms          # ignore the lexicon for one run
 button. The lexicon is applied at transcription time, so it lands in
 `transcript.json` and every render.
 
+## Cleanup pass (LLM, optional)
+
+Whisper keeps meaning but fumbles cleanup-class detail — brand names, jargon,
+homophones, punctuation, run-together compounds ("missed lead" → "mislead").
+A second stage runs the transcript past an LLM with the lexicon's `terms` as a
+glossary and a tight instruction: **fix only obvious transcription errors,
+preserve wording and meaning, no summarising or rephrasing.**
+
+```
+STT  ->  lexicon fixes  ->  LLM cleanup  ->  final transcript
+```
+
+Any OpenAI-compatible endpoint — Ollama (`http://localhost:11434/v1`, the
+default), llama.cpp / LM Studio / vLLM, or a hosted API with
+`CHIMPWORKS_LLM_API_KEY`. Off until you set `cleanup_model`.
+
+```bash
+chimpworks transcribe ... --cleanup --cleanup-model qwen2.5:7b-instruct
+chimpworks cleanup "~/…/Lecture 7.transcript.json" --cleanup-model qwen2.5:7b-instruct
+```
+
+`chimpworks cleanup` runs the pass on an existing `transcript.json` in place and
+re-renders — the loop for tuning the prompt / glossary / model against a known
+transcript. Segments are sent as numbered lines and must return one-for-one; any
+chunk whose reply doesn't line up is left untouched, so a weak model degrades to
+"no change", never to a scrambled transcript. GUI: the **Clean up with LLM**
+checkbox, endpoint + model in **Settings…**.
+
 ## GUI (v1.3 — Chimpwriter)
 
 ```bash
