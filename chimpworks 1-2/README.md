@@ -78,6 +78,26 @@ still pattern-matches it as a YouTube URL, then fails with a confusing
 citation style, run the article pass — **without re-downloading or
 re-transcribing.**
 
+## Terminology library
+
+Whisper mangles jargon and proper nouns (`n8n` → "N10", "neighten", "N8 N").
+A user-owned `lexicon.toml` (`<config>/lexicon.toml`, or `--terms PATH`) fixes it
+two ways: **terms** are passed to the transcriber as `hotwords` so it spells them
+right up front; **fixes** are literal/regex substitutions applied to the text
+afterwards for the ones the hint misses.
+
+```bash
+chimpworks terms add n8n Make.com LangChain
+chimpworks terms fix neighten n8n
+chimpworks terms fix '\bN[ -]?10\b' n8n --regex
+chimpworks terms list
+chimpworks transcribe ... --no-terms          # ignore the lexicon for one run
+```
+
+`config/lexicon.example.toml` is a starter. In the GUI it's the **Terminology…**
+button. The lexicon is applied at transcription time, so it lands in
+`transcript.json` and every render.
+
 ## GUI (v1.3 — Chimpwriter)
 
 ```bash

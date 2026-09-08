@@ -13,6 +13,7 @@ from ..core.pipeline import TranscribeOptions
 from ..paths import MODELS_DIR
 from ..render.packet import PacketOptions
 from . import secrets as hfsecrets
+from .lexicon_dialog import LexiconDialog
 from .prefs import SPEED_TO_MODEL, GuiPrefs, load_prefs, save_prefs
 from .worker import JobWorker
 
@@ -268,11 +269,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stop_btn = QtWidgets.QPushButton("Stop")
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self._stop)
+        terms_btn = QtWidgets.QPushButton("Terminology…")
+        terms_btn.clicked.connect(self._open_lexicon)
         gear = QtWidgets.QPushButton("Settings…")
         gear.clicked.connect(self._open_settings)
         btnrow.addWidget(self.go_btn)
         btnrow.addWidget(self.stop_btn)
         btnrow.addStretch(1)
+        btnrow.addWidget(terms_btn)
         btnrow.addWidget(gear)
         v.addLayout(btnrow)
 
@@ -341,6 +345,9 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg = SettingsDialog(self.prefs, self)
         if dlg.exec() == QtWidgets.QDialog.Accepted:
             self._refresh_token_banner()
+
+    def _open_lexicon(self) -> None:
+        LexiconDialog(self).exec()
 
     # -- job lifecycle -----------------------------------------------------
     def _start(self) -> None:

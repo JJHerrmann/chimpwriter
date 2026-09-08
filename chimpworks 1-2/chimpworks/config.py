@@ -52,6 +52,7 @@ class Config:
     diarize: bool = False
     diarize_model: str = "pyannote/speaker-diarization-3.1"
     yt_cookies_from_browser: str = ""        # e.g. "firefox" - passed to yt-dlp
+    lexicon: str = ""                        # "" => <config>/lexicon.toml
     source_path: str | None = None
 
     def resolved_output_dir(self) -> Path:

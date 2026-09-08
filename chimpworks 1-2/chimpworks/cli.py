@@ -48,6 +48,10 @@ def _packet_opts(args, cfg) -> PacketOptions:
 
 
 def _transcribe_opts(args, cfg) -> TranscribeOptions:
+    if getattr(args, "no_terms", False):
+        lexicon_path: str | None = None
+    else:
+        lexicon_path = getattr(args, "terms", None) or cfg.lexicon or ""
     return TranscribeOptions(
         model=resolve_model(args.model or cfg.model),
         language=args.language or cfg.language,
@@ -58,6 +62,7 @@ def _transcribe_opts(args, cfg) -> TranscribeOptions:
         diarize_model=cfg.diarize_model,
         hf_token=hf_token(),
         cookies_from_browser=cfg.yt_cookies_from_browser,
+        lexicon_path=lexicon_path,
     )
 
 
@@ -131,6 +136,51 @@ def cmd_doctor(args) -> int:  # noqa: ARG001
     return 0 if ok else 1
 
 
+def cmd_terms(args) -> int:
+    from .core.lexicon import load_lexicon, read_raw, save_lexicon
+
+    path = getattr(args, "terms", None)
+    sub = getattr(args, "terms_cmd", None)
+
+    if sub in (None, "list"):
+        lex = load_lexicon(path)
+        print(f"# {lex.source}")
+        print("terms:", ", ".join(lex.terms) or "(none)")
+        if lex.fixes:
+            print("fixes:")
+            for _pat, repl, key in lex.fixes:
+                print(f"  {key!r} -> {repl!r}")
+        else:
+            print("fixes: (none)")
+        return 0
+
+    if sub == "path":
+        _terms, _fixes, p = read_raw(path)
+        print(p)
+        return 0
+
+    terms, fixes, p = read_raw(path)
+    if sub == "add":
+        terms.extend(args.term)
+        save_lexicon(terms, fixes, p)
+        print(f"added {len(args.term)} term(s) -> {p}")
+    elif sub == "fix":
+        key = args.bad
+        if args.regex and not key.startswith("re:"):
+            key = f"re:{key}"
+        fixes[key] = args.good
+        save_lexicon(terms, fixes, p)
+        print(f"{key!r} -> {args.good!r}  ({p})")
+    elif sub == "remove":
+        before = (len(terms), len(fixes))
+        terms = [t for t in terms if t.lower() != args.key.lower()]
+        fixes = {k: v for k, v in fixes.items() if k != args.key}
+        save_lexicon(terms, fixes, p)
+        removed = before[0] - len(terms) + before[1] - len(fixes)
+        print(f"removed {removed} entr{'y' if removed == 1 else 'ies'} -> {p}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="chimpworks", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -153,6 +203,8 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--language", help="ISO code or 'auto'")
         sp.add_argument("--device", choices=["auto", "cpu", "cuda"])
         sp.add_argument("--diarize", action="store_true")
+        sp.add_argument("--terms", metavar="PATH", help="terminology lexicon (default: <config>/lexicon.toml)")
+        sp.add_argument("--no-terms", action="store_true", help="ignore the terminology lexicon")
 
     t = sub.add_parser("transcribe", help="one URL or file -> research packet")
     t.add_argument("input")
@@ -173,6 +225,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     d = sub.add_parser("doctor", help="check optional dependencies")
     d.set_defaults(func=cmd_doctor)
+
+    tm = sub.add_parser("terms", help="manage the terminology lexicon (hotwords + fixes)")
+    tm.add_argument("--terms", metavar="PATH", help="lexicon file (default: <config>/lexicon.toml)")
+    tsub = tm.add_subparsers(dest="terms_cmd")
+    tsub.add_parser("list", help="print the current lexicon")
+    tsub.add_parser("path", help="print the lexicon file path")
+    ta = tsub.add_parser("add", help="add one or more hotword terms")
+    ta.add_argument("term", nargs="+")
+    tf = tsub.add_parser("fix", help="add a substitution: <bad> -> <good>")
+    tf.add_argument("bad")
+    tf.add_argument("good")
+    tf.add_argument("--regex", action="store_true", help="treat <bad> as a regex")
+    tr = tsub.add_parser("remove", help="remove a term or a fix key")
+    tr.add_argument("key")
+    tm.set_defaults(func=cmd_terms)
     return p
 
 

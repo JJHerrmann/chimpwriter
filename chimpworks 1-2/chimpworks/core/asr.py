@@ -65,24 +65,22 @@ def transcribe(
     vad_filter: bool = True,
     device: str = "auto",
     compute_type: str = "auto",
+    hotwords: str = "",
     progress: Progress = noop_progress,
 ) -> tuple[list[Segment], str]:
     """Return (segments, detected_language)."""
     model = load_model(model_size, device=device, compute_type=compute_type)
     lang = None if not language or language.lower() == "auto" else language
+    kw = dict(language=lang, vad_filter=vad_filter, word_timestamps=word_timestamps)
+    if hotwords:
+        kw["hotwords"] = hotwords
     try:
-        raw_segments, info = model.transcribe(
-            str(wav_path), language=lang, vad_filter=vad_filter,
-            word_timestamps=word_timestamps,
-        )
+        raw_segments, info = model.transcribe(str(wav_path), **kw)
     except Exception as exc:  # noqa: BLE001
         msg = str(exc).lower()
         if "cuda" in msg or "cublas" in msg:
             model = load_model(model_size, device="cpu", compute_type="int8")
-            raw_segments, info = model.transcribe(
-                str(wav_path), language=lang, vad_filter=vad_filter,
-                word_timestamps=word_timestamps,
-            )
+            raw_segments, info = model.transcribe(str(wav_path), **kw)
         else:
             raise
 

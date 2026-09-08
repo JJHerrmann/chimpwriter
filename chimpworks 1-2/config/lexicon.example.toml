@@ -1,0 +1,30 @@
+# chimpworks terminology library. Copy to <config>/lexicon.toml
+# (~/.config/chimpworks/lexicon.toml on Linux) or point --terms at it.
+#
+# `terms`  -> fed to faster-whisper as `hotwords`, biasing the transcription
+#             toward these spellings.
+# `[fixes]` -> applied to the transcript text after ASR. A key is a
+#             case-insensitive whole-word match unless it starts with `re:`,
+#             which makes the rest a regex. Applied top to bottom.
+
+terms = [
+    "n8n",
+    "Make.com",
+    "Zapier",
+    "LangChain",
+    "LlamaIndex",
+    "Pinecone",
+    "Supabase",
+    "webhook",
+    "Anthropic",
+    "OpenAI",
+]
+
+[fixes]
+"neighten"           = "n8n"
+"N8 N"               = "n8n"
+"re:\\bN[ -]?10\\b"  = "n8n"
+"re:\\bnadn\\b"      = "n8n"
+"make dot com"       = "Make.com"
+"lang chain"         = "LangChain"
+"pine cone"          = "Pinecone"

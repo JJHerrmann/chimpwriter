@@ -13,6 +13,7 @@ from pathlib import Path
 from ..log import Progress, get_logger, noop_progress
 from ..models import SourceMeta, Transcript
 from . import asr, audio, diarize as diar
+from .lexicon import Lexicon, load_lexicon
 from .sources import fetch_audio, probe_metadata, resolve_source
 
 log = get_logger(__name__)
@@ -29,6 +30,8 @@ class TranscribeOptions:
     diarize_model: str = "pyannote/speaker-diarization-3.1"
     hf_token: str = ""
     cookies_from_browser: str = ""
+    # terminology library: "" -> default lexicon.toml, None -> disabled
+    lexicon_path: str | None = ""
 
 
 def build_transcript(
@@ -54,6 +57,12 @@ def build_transcript(
         progress("decode", None)
         wav = audio.to_wav(media, workdir / "audio.wav")
 
+        lex: Lexicon = (
+            load_lexicon(opts.lexicon_path) if opts.lexicon_path is not None else Lexicon()
+        )
+        if lex.terms:
+            log.info("lexicon: %d hotword(s) from %s", len(lex.terms), lex.source)
+
         segments, language = asr.transcribe(
             wav,
             model_size=opts.model,
@@ -61,8 +70,21 @@ def build_transcript(
             word_timestamps=opts.word_timestamps,
             device=opts.device,
             compute_type=opts.compute_type,
+            hotwords=lex.hotwords(),
             progress=progress,
         )
+
+        if lex.fixes:
+            n = 0
+            for seg in segments:
+                fixed = lex.apply(seg.text)
+                if fixed != seg.text:
+                    n += 1
+                    seg.text = fixed
+                for w in seg.words:
+                    w.word = lex.apply(w.word)
+            if n:
+                log.info("lexicon: applied fixes to %d segment(s)", n)
 
         turns = []
         if opts.diarize:
