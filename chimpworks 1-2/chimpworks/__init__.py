@@ -6,7 +6,7 @@ SRT/VTT, speaker-labelled transcript, article pass, digest, and citations.
 
 The v1 GUI logic lived tangled inside ``app/transcribe.py`` behind a Qt
 ``QThread``. Here the pipeline is plain Python with a ``progress`` callback, so
-it runs from the CLI, from tests, and (later) from a thin GUI shell.
+it runs from the CLI, from tests, and from the v1.3 GUI shell (``chimpworks.gui``).
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"

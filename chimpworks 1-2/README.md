@@ -70,9 +70,29 @@ chimpworks batch @urls.txt --model whale
 chimpworks render "~/Documents/Chimpworks/Research/PHYS 451/Lecture 7/Lecture 7.transcript.json" --formats srt,vtt --article
 ```
 
+Use a real 11-character video id — `VIDEOID` above is a placeholder. yt-dlp
+still pattern-matches it as a YouTube URL, then fails with a confusing
+`Unsupported URL` when it isn't a real id.
+
 `render` re-emits from an existing `transcript.json` — add formats, switch
 citation style, run the article pass — **without re-downloading or
 re-transcribing.**
+
+## GUI (v1.3 — Chimpwriter)
+
+```bash
+python -m pip install -e ".[gui]"    # PySide6-Essentials + keyring
+chimpwriter                          # or: python -m chimpworks.gui
+```
+
+A thin PySide6 window over the same `build_transcript` + `write_packet` path:
+source field, speed/language, output folder, the diarize / article / citation
+toggles, a progress bar and a log pane. **Settings…** holds the Hugging Face
+token (OS keyring, falling back to a `0600` `secrets.toml` in the config dir)
+with a **Test** button that checks both auth and access to the gated
+`pyannote/speaker-diarization-community-1` repo. The token section hides itself
+once the diarization model has been downloaded — after that every run is
+offline. The engine is unchanged; the GUI only adds token storage.
 
 ## Tests
 
@@ -87,5 +107,4 @@ yt-dlp) so the suite runs with no models, no ffmpeg, and no network.
 
 - **Library**: SQLite + FTS5 index over the `Research/` tree, `chimpworks library search`, content-hash dedup so a re-run of the same video is skipped.
 - **LLM digest**: real summaries/quotes via a local endpoint, behind the existing `Digest` protocol.
-- **GUI shell (v1-3)**: a thin PySide6 tray/dropzone that calls `build_transcript` + `write_packet` — the `[gui]` extra is reserved.
-- **Packaging**: PyInstaller/Briefcase for Windows + macOS, bundled ffmpeg.
+- **GUI polish (post-1.3)**: drag-and-drop / tray from v1-1, batch panel, per-job cancel during model load, packaging (PyInstaller/Briefcase, bundled ffmpeg).

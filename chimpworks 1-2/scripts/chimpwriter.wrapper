@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Chimpwriter GUI launcher (v1.3). Same venv + CUDA setup as the `chimpworks`
+# CLI wrapper, but WITHOUT the HF offline flags -- the GUI may still need to
+# download a whisper size or vendor the diarization model on first use. Once
+# those are cached, runs are offline anyway (pyannote loads from a local path).
+#
+#   install:  cp scripts/chimpwriter.wrapper ~/.local/bin/chimpwriter && chmod +x $_
+
+VENV="$HOME/.local/share/chimpworks/venv"
+PY="$VENV/bin/python"
+
+# ctranslate2 needs the CUDA 12 runtime; torch ships CUDA 13. Point the loader
+# at the pip nvidia-*-cu12 libs or faster-whisper silently drops to CPU.
+_nv="$("$PY" -c 'import os, nvidia; print(os.path.dirname(nvidia.__file__))' 2>/dev/null)"
+if [ -n "$_nv" ]; then
+  for _d in cublas cudnn cuda_nvrtc; do
+    [ -d "$_nv/$_d/lib" ] && LD_LIBRARY_PATH="$_nv/$_d/lib:${LD_LIBRARY_PATH}"
+  done
+  export LD_LIBRARY_PATH
+fi
+
+exec "$PY" -m chimpworks.gui "$@"
