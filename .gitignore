@@ -1,0 +1,31 @@
+# virtualenvs (bundled Windows .venv in v1-1 is ~2 GB, never commit)
+.venv/
+venv/
+env/
+
+# python build/cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+*.spec
+
+# local config & secrets
+config/config.toml
+config/secrets.*
+**/settings.json
+
+# runtime output
+Research/
+*.transcript.json
+*.srt
+*.vtt
+
+# OS cruft
+desktop.ini
+.DS_Store
+Thumbs.db
+
+# vendored models (fetched by scripts/setup_models.sh)
+models/
