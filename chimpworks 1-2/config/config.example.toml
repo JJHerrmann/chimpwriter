@@ -1,0 +1,27 @@
+# chimpworks configuration. Copy to config.toml (or point CHIMPWORKS_CONFIG at it).
+# The Hugging Face token for gated pyannote models is NOT set here - export
+# CHIMPWORKS_HF_TOKEN instead.
+
+# "" => <platform Documents>/Chimpworks
+output_dir = ""
+default_topic = "General"
+
+# tiny | base | small | medium | large-v2 | large-v3
+# (cheetah -> tiny, dolphin -> small, whale -> large-v3 still work)
+model = "small"
+language = "auto"          # ISO code or "auto"
+device = "auto"           # auto | cpu | cuda
+compute_type = "auto"     # auto | int8 | float16 | ...
+word_timestamps = true
+
+formats = ["txt", "srt", "vtt", "json"]   # + article, summary, quotes
+make_article = false
+make_citation = true
+citation_style = "apa"    # apa | mla | chicago
+digest = "heuristic"      # heuristic | off  (LLM backend is a later phase)
+
+diarize = false
+diarize_model = "pyannote/speaker-diarization-3.1"   # or an absolute local path
+
+# pass-through to yt-dlp --cookies-from-browser, e.g. "firefox", "chrome"
+yt_cookies_from_browser = ""

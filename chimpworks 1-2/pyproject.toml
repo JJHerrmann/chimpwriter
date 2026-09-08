@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chimpworks"
+version = "1.2.0"
+description = "Local research-assistant: video/audio -> structured transcript + citable research packet."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "faster-whisper>=1.1.0",
+    "yt-dlp>=2024.1.0",
+    "platformdirs>=4.0",
+]
+
+[project.optional-dependencies]
+diarize = ["pyannote.audio>=3.1"]
+ffmpeg = ["imageio-ffmpeg>=0.5"]     # fallback if system ffmpeg isn't on PATH
+gui = ["PySide6>=6.6"]               # v1-3: the tray/dropzone shell, not built yet
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+chimpworks = "chimpworks.cli:main"
+
+[tool.setuptools]
+packages = ["chimpworks", "chimpworks.core", "chimpworks.render"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
