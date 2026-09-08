@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# chimpworks launcher -- isolated venv, local-first models.
+#
+#   venv:    ~/.local/share/chimpworks/venv        (rebuild: see below)
+#   source:  ~/Work/chimpwriter/chimpworks 1-2  (git repo; -e install into the venv)
+#   config:  ~/.config/chimpworks/config.toml
+#   models:  faster-whisper -> ~/.cache/huggingface/hub/models--Systran--faster-whisper-*
+#            pyannote diar  -> ~/.local/share/chimpworks/models/pyannote-community-1
+#
+# Rebuild the venv (e.g. after an Arch python minor bump breaks it):
+#   rm -rf ~/.local/share/chimpworks/venv
+#   python3 -m venv ~/.local/share/chimpworks/venv
+#   ~/.local/share/chimpworks/venv/bin/python -m pip install \
+#     faster-whisper "pyannote.audio==4.0.7" nvidia-cublas-cu12 "nvidia-cudnn-cu12>=9,<10" \
+#     -e "$HOME/Work/chimpwriter/chimpworks 1-2"
+
+VENV="$HOME/.local/share/chimpworks/venv"
+PY="$VENV/bin/python"
+
+# No Hugging Face callout on a normal run (models are vendored/cached). To add a
+# whisper size or re-vendor: HF_HUB_OFFLINE=0 CHIMPWORKS_HF_TOKEN=hf_xxx chimpworks ...
+export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
+export TRANSFORMERS_OFFLINE="${TRANSFORMERS_OFFLINE:-1}"
+
+# ctranslate2 4.8.2 wants the CUDA 12 runtime (libcublas.so.12 / libcudnn.so.9);
+# torch ships CUDA 13. Point the loader at the pip nvidia-*-cu12 libs or
+# faster-whisper silently falls back to CPU (~20x slower). torch finds its own
+# CUDA 13 libs via RPATH, so only the cu12 dirs go here.
+_nv="$("$PY" -c 'import os, nvidia; print(os.path.dirname(nvidia.__file__))' 2>/dev/null)"
+if [ -n "$_nv" ]; then
+  for _d in cublas cudnn cuda_nvrtc; do
+    [ -d "$_nv/$_d/lib" ] && LD_LIBRARY_PATH="$_nv/$_d/lib:${LD_LIBRARY_PATH}"
+  done
+  export LD_LIBRARY_PATH
+fi
+
+exec "$PY" -m chimpworks "$@"

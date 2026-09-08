@@ -42,6 +42,13 @@ def load_pipeline(model: str, hf_token: str | None = None):
         pipeline = Pipeline.from_pretrained(model, use_auth_token=hf_token)
     else:
         pipeline = Pipeline.from_pretrained(model)
+    try:  # a GPU still helps on long crosstalk audio
+        import torch
+
+        if torch.cuda.is_available():
+            pipeline.to(torch.device("cuda"))
+    except Exception:  # noqa: BLE001
+        pass
     _PIPELINE_CACHE[model] = pipeline
     return pipeline
 
@@ -59,7 +66,10 @@ def diarize(
 ) -> list[SpeakerTurn]:
     progress("diarize", None)
     pipeline = load_pipeline(model, hf_token)
-    annotation = pipeline(str(wav_path))
+    result = pipeline(str(wav_path))
+    # pyannote 3.x returned an Annotation directly; 4.x wraps it in a
+    # DiarizeOutput (``.speaker_diarization`` keeps overlapping turns).
+    annotation = getattr(result, "speaker_diarization", result)
     turns = [
         SpeakerTurn(start=float(turn.start), end=float(turn.end), speaker=str(speaker))
         for turn, _track, speaker in annotation.itertracks(yield_label=True)

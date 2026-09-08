@@ -9,6 +9,9 @@ description = "Local research-assistant: video/audio -> structured transcript + 
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
+# Floors only. For a reproducible install use the pinned set:
+#   pip install -r requirements.lock -e .
+# (requirements.lock is `pip freeze` of a known-good venv -- Python 3.14 / CUDA.)
 dependencies = [
     "faster-whisper>=1.1.0",
     "yt-dlp>=2024.1.0",
@@ -16,7 +19,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-diarize = ["pyannote.audio>=3.1"]
+# pyannote.audio is pinned: 4.x changed the SpeakerDiarization pipeline (see
+# chimpworks/core/diarize.py), and 3.x cannot run on the torchaudio 2.9+ that
+# Python 3.14 forces (`torchaudio.list_audio_backends` was removed).
+# The nvidia-*-cu12 libs are for ctranslate2 4.x, which needs the CUDA 12
+# runtime while torch ships CUDA 13; the `chimpworks` launcher puts them on
+# LD_LIBRARY_PATH. Drop them on a CUDA-12 torch or a CPU-only box.
+diarize = [
+    "pyannote.audio==4.0.7",
+    "nvidia-cublas-cu12",
+    "nvidia-cudnn-cu12>=9,<10",
+]
 ffmpeg = ["imageio-ffmpeg>=0.5"]     # fallback if system ffmpeg isn't on PATH
 gui = ["PySide6>=6.6"]               # v1-3: the tray/dropzone shell, not built yet
 dev = ["pytest>=7.0"]
