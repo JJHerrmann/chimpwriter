@@ -16,6 +16,7 @@ dependencies = [
     "faster-whisper>=1.1.0",
     "yt-dlp>=2024.1.0",
     "platformdirs>=4.0",
+    "cryptography>=42",   # licensing.py: offline Ed25519 verification of the entitlement tokens
 ]
 
 [project.optional-dependencies]

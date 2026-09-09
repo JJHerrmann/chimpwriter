@@ -10,6 +10,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from .. import licensing
 from ..log import Progress, get_logger, noop_progress
 from ..models import SourceMeta, Transcript
 from . import asr, audio, diarize as diar
@@ -47,6 +48,12 @@ def build_transcript(
     workdir: str | Path | None = None,
     progress: Progress = noop_progress,
 ) -> Transcript:
+    # Pro gates — no-ops unless a build enables enforcement (licensing.ENFORCE).
+    if opts.diarize:
+        licensing.require("diarize")
+    if opts.cleanup:
+        licensing.require("cleanup")
+
     ctx: tempfile.TemporaryDirectory | None = None
     if workdir is None:
         ctx = tempfile.TemporaryDirectory(prefix="chimpworks-")

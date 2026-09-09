@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .. import licensing
 from ..log import get_logger
 from ..models import Transcript
 from . import citation as cite
@@ -48,6 +49,12 @@ def packet_dir(root: str | Path, topic: str, source_name: str) -> Path:
 
 
 def write_packet(transcript: Transcript, root: str | Path, opts: PacketOptions) -> list[Path]:
+    # Pro gate — the readable article render. Citation + digest stay free.
+    # No-op unless a build enables enforcement (licensing.ENFORCE).
+    want_article = opts.make_article or "article" in set(opts.formats)
+    if want_article:
+        licensing.require("packet")
+
     formats = set(opts.formats) | {"json"}
     unknown = formats - KNOWN_FORMATS
     if unknown:

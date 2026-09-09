@@ -17,6 +17,10 @@
 VENV="$HOME/.local/share/chimpworks/venv"
 PY="$VENV/bin/python"
 
+# Secrets (LLM cleanup bearer token, etc.) -- 0600 KEY=VALUE file, git-ignored.
+_env="$HOME/.config/chimpworks/env"
+[ -f "$_env" ] && set -a && . "$_env" && set +a
+
 # No Hugging Face callout on a normal run (models are vendored/cached). To add a
 # whisper size or re-vendor: HF_HUB_OFFLINE=0 CHIMPWORKS_HF_TOKEN=hf_xxx chimpworks ...
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from .. import __version__
+from .. import __version__, licensing
 from ..config import load_config, resolve_model
 from ..core.pipeline import TranscribeOptions
 from ..paths import MODELS_DIR
@@ -62,6 +62,45 @@ class _TokenTester(QtCore.QThread):
         self.result.emit(hfsecrets.verify_token(self._token))
 
 
+class _CleanupTester(QtCore.QThread):
+    result = QtCore.Signal(dict)
+
+    def __init__(self, endpoint: str, model: str, key: str, parent=None):
+        super().__init__(parent)
+        self._endpoint, self._model, self._key = endpoint, model, key
+
+    def run(self) -> None:
+        self.result.emit(
+            hfsecrets.verify_cleanup_endpoint(self._endpoint, self._model, self._key)
+        )
+
+
+class _LicenceWorker(QtCore.QThread):
+    """activate / refresh / deactivate against the licensing service, off-thread."""
+
+    done = QtCore.Signal(bool, str)  # ok, message
+
+    def __init__(self, action: str, key: str = "", parent=None):
+        super().__init__(parent)
+        self._action, self._key = action, key
+
+    def run(self) -> None:
+        try:
+            if self._action == "activate":
+                ent = licensing.activate(self._key, label="Chimpwriter")
+            elif self._action == "deactivate":
+                licensing.deactivate()
+                self.done.emit(True, "Licence removed from this machine.")
+                return
+            else:
+                ent = licensing.refresh()
+            self.done.emit(True, licensing.status_line() if ent else "Refreshed.")
+        except licensing.LicenceError as exc:
+            self.done.emit(False, str(exc))
+        except Exception as exc:  # noqa: BLE001
+            self.done.emit(False, f"Unexpected error: {exc}")
+
+
 # --------------------------------------------------------------------------- #
 #  Settings dialog                                                             #
 # --------------------------------------------------------------------------- #
@@ -70,6 +109,8 @@ class SettingsDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self.prefs = prefs
         self._tester: _TokenTester | None = None
+        self._cleanup_tester: _CleanupTester | None = None
+        self._lic_worker: _LicenceWorker | None = None
         self.setWindowTitle("Chimpwriter settings")
         self.setModal(True)
         self.setMinimumWidth(520)
@@ -96,6 +137,33 @@ class SettingsDialog(QtWidgets.QDialog):
         self.cleanup_model_edit.setPlaceholderText("qwen2.5:7b-instruct  (OpenAI-compatible)")
         form.addRow("Cleanup endpoint", self.cleanup_endpoint_edit)
         form.addRow("Cleanup model", self.cleanup_model_edit)
+
+        keyrow = QtWidgets.QHBoxLayout()
+        keyrow.setContentsMargins(0, 0, 0, 0)
+        self.cleanup_key_edit = QtWidgets.QLineEdit()
+        self.cleanup_key_edit.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.cleanup_key_edit.setPlaceholderText("only for hosted / token-gated endpoints")
+        self.show_key = QtWidgets.QToolButton()
+        self.show_key.setText("show")
+        self.show_key.setCheckable(True)
+        self.show_key.toggled.connect(
+            lambda on: self.cleanup_key_edit.setEchoMode(
+                QtWidgets.QLineEdit.Normal if on else QtWidgets.QLineEdit.Password
+            )
+        )
+        self.cleanup_test_btn = QtWidgets.QPushButton("Test")
+        self.cleanup_test_btn.clicked.connect(self._test_cleanup)
+        keyrow.addWidget(self.cleanup_key_edit, 1)
+        keyrow.addWidget(self.show_key)
+        keyrow.addWidget(self.cleanup_test_btn)
+        keyw = QtWidgets.QWidget()
+        keyw.setLayout(keyrow)
+        form.addRow("Cleanup API key", keyw)
+
+        self.cleanup_status = QtWidgets.QLabel()
+        self.cleanup_status.setWordWrap(True)
+        self.cleanup_status.setStyleSheet("color: #9aa3ad;")
+        form.addRow("", self.cleanup_status)
         lay.addLayout(form)
 
         # --- Hugging Face token group ---
@@ -152,6 +220,8 @@ class SettingsDialog(QtWidgets.QDialog):
             done.setWordWrap(True)
             lay.addWidget(done)
 
+        lay.addWidget(self._build_licence_box())
+
         btns = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.Save | QtWidgets.QDialogButtonBox.Cancel
         )
@@ -163,7 +233,127 @@ class SettingsDialog(QtWidgets.QDialog):
         self.diar_model_edit.setText(self.prefs.diarize_model)
         self.cleanup_endpoint_edit.setText(self.prefs.cleanup_endpoint)
         self.cleanup_model_edit.setText(self.prefs.cleanup_model)
+        self.cleanup_key_edit.setText(hfsecrets.load_llm_key())
         self.token_edit.setText(hfsecrets.load_token())
+        try:
+            self.lic_key_edit.setText((licensing.LICENCE_DIR / "license_key").read_text("utf-8").strip())
+        except OSError:
+            pass
+        self._lic_refresh_status()
+
+    # -- licence pane -------------------------------------------------------
+    def _build_licence_box(self) -> QtWidgets.QGroupBox:
+        box = QtWidgets.QGroupBox("Chimpwriter Pro licence")
+        v = QtWidgets.QVBoxLayout(box)
+        v.setSpacing(8)
+
+        self.lic_status = QtWidgets.QLabel()
+        self.lic_status.setWordWrap(True)
+        v.addWidget(self.lic_status)
+
+        row = QtWidgets.QHBoxLayout()
+        self.lic_key_edit = QtWidgets.QLineEdit()
+        self.lic_key_edit.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.lic_key_edit.setPlaceholderText("licence key from your purchase email")
+        show = QtWidgets.QToolButton()
+        show.setText("show")
+        show.setCheckable(True)
+        show.toggled.connect(
+            lambda on: self.lic_key_edit.setEchoMode(
+                QtWidgets.QLineEdit.Normal if on else QtWidgets.QLineEdit.Password
+            )
+        )
+        self.lic_activate_btn = QtWidgets.QPushButton("Activate")
+        self.lic_activate_btn.clicked.connect(lambda: self._lic_run("activate"))
+        row.addWidget(self.lic_key_edit, 1)
+        row.addWidget(show)
+        row.addWidget(self.lic_activate_btn)
+        v.addLayout(row)
+
+        btns = QtWidgets.QHBoxLayout()
+        self.lic_refresh_btn = QtWidgets.QPushButton("Refresh")
+        self.lic_refresh_btn.clicked.connect(lambda: self._lic_run("refresh"))
+        self.lic_savecert_btn = QtWidgets.QPushButton("Save certificate…")
+        self.lic_savecert_btn.clicked.connect(self._lic_save_cert)
+        self.lic_deactivate_btn = QtWidgets.QPushButton("Deactivate")
+        self.lic_deactivate_btn.clicked.connect(lambda: self._lic_run("deactivate"))
+        btns.addWidget(self.lic_refresh_btn)
+        btns.addWidget(self.lic_savecert_btn)
+        btns.addStretch(1)
+        btns.addWidget(self.lic_deactivate_btn)
+        v.addLayout(btns)
+
+        self.lic_result = QtWidgets.QLabel()
+        self.lic_result.setWordWrap(True)
+        self.lic_result.setStyleSheet("color: #9aa3ad;")
+        v.addWidget(self.lic_result)
+
+        if not licensing.configured():
+            note = QtWidgets.QLabel(
+                "This build has no licensing service configured — every feature is "
+                "available. The controls above do nothing yet."
+            )
+            note.setWordWrap(True)
+            note.setStyleSheet("color: #6b7280; font-size: 11px;")
+            v.addWidget(note)
+        return box
+
+    def _lic_refresh_status(self) -> None:
+        licensing.cached.cache_clear()
+        self.lic_status.setText(licensing.status_line())
+        has_cert = (licensing.LICENCE_DIR / "cert").exists()
+        self.lic_savecert_btn.setEnabled(has_cert)
+
+    def _lic_run(self, action: str) -> None:
+        for b in (self.lic_activate_btn, self.lic_refresh_btn, self.lic_deactivate_btn):
+            b.setEnabled(False)
+        self.lic_result.setStyleSheet("color: #9aa3ad;")
+        self.lic_result.setText({"activate": "Activating…", "refresh": "Refreshing…",
+                                 "deactivate": "Removing…"}[action])
+        self._lic_worker = _LicenceWorker(action, self.lic_key_edit.text().strip(), self)
+        self._lic_worker.done.connect(self._lic_done)
+        self._lic_worker.start()
+
+    def _lic_done(self, ok: bool, message: str) -> None:
+        for b in (self.lic_activate_btn, self.lic_refresh_btn, self.lic_deactivate_btn):
+            b.setEnabled(True)
+        self.lic_result.setStyleSheet("color: #6fcf97;" if ok else "color: #eb5757;")
+        self.lic_result.setText(message)
+        self._lic_refresh_status()
+
+    def _lic_save_cert(self) -> None:
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save perpetual certificate", "chimpwriter-1x.cert"
+        )
+        if not path:
+            return
+        try:
+            licensing.save_certificate(path)
+            self.lic_result.setStyleSheet("color: #6fcf97;")
+            self.lic_result.setText(f"Certificate saved to {path}")
+        except licensing.LicenceError as exc:
+            self.lic_result.setStyleSheet("color: #eb5757;")
+            self.lic_result.setText(str(exc))
+
+    def _test_cleanup(self) -> None:
+        self.cleanup_test_btn.setEnabled(False)
+        self.cleanup_status.setStyleSheet("color: #9aa3ad;")
+        self.cleanup_status.setText("Contacting the endpoint…")
+        self._cleanup_tester = _CleanupTester(
+            self.cleanup_endpoint_edit.text().strip(),
+            self.cleanup_model_edit.text().strip(),
+            self.cleanup_key_edit.text().strip(),
+            self,
+        )
+        self._cleanup_tester.result.connect(self._test_cleanup_done)
+        self._cleanup_tester.start()
+
+    def _test_cleanup_done(self, res: dict) -> None:
+        self.cleanup_test_btn.setEnabled(True)
+        self.cleanup_status.setStyleSheet(
+            "color: #6fcf97;" if res.get("ok") else "color: #eb5757;"
+        )
+        self.cleanup_status.setText(res.get("detail", ""))
 
     def _test_token(self) -> None:
         self.test_btn.setEnabled(False)
@@ -191,6 +381,7 @@ class SettingsDialog(QtWidgets.QDialog):
             self.cleanup_endpoint_edit.text().strip() or "http://localhost:11434/v1"
         )
         self.prefs.cleanup_model = self.cleanup_model_edit.text().strip()
+        hfsecrets.save_llm_key(self.cleanup_key_edit.text().strip())
         where = hfsecrets.save_token(self.token_edit.text().strip())
         self.storage_hint.setText(f"Stored in: {where}")
         save_prefs(self.prefs)
@@ -210,6 +401,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._build()
         self._load_prefs()
         self._refresh_token_banner()
+        self._apply_licence_gates()
+        self._licence_startup_refresh()
 
     # -- construction ----------------------------------------------------
     def _build(self) -> None:
@@ -268,6 +461,12 @@ class MainWindow(QtWidgets.QMainWindow):
         v.addWidget(self.cleanup_check)
         v.addWidget(self.article_check)
         v.addWidget(self.cite_check)
+        # checkbox -> (Pro feature it needs, its plain label). cite_check stays free.
+        self._pro_checks = {
+            self.diar_check: ("diarize", self.diar_check.text()),
+            self.cleanup_check: ("cleanup", self.cleanup_check.text()),
+            self.article_check: ("packet", self.article_check.text()),
+        }
 
         self.token_banner = QtWidgets.QLabel()
         self.token_banner.setWordWrap(True)
@@ -347,6 +546,30 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self.token_banner.show()
 
+    # -- licence gating -------------------------------------------------
+    def _apply_licence_gates(self) -> None:
+        """Disable Pro checkboxes when enforcement is on and the feature is locked."""
+        licensing.cached.cache_clear()
+        for check, (feature, base) in self._pro_checks.items():
+            if licensing.enforcing() and not licensing.has(feature):
+                check.setChecked(False)
+                check.setEnabled(False)
+                check.setText(f"{base}  — Pro")
+                check.setToolTip("Add a Chimpwriter Pro licence in Settings → Licence.")
+            else:
+                check.setEnabled(True)
+                check.setText(base)
+                check.setToolTip("")
+
+    def _licence_startup_refresh(self) -> None:
+        if not licensing.configured():
+            return
+        if not (licensing.LICENCE_DIR / "license_key").exists():
+            return
+        self._lic_startup = _LicenceWorker("refresh", "", self)
+        self._lic_startup.done.connect(lambda *_: self._apply_licence_gates())
+        self._lic_startup.start()
+
     # -- dialogs --------------------------------------------------------
     def _choose_file(self) -> None:
         path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Choose audio or video")
@@ -362,6 +585,7 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg = SettingsDialog(self.prefs, self)
         if dlg.exec() == QtWidgets.QDialog.Accepted:
             self._refresh_token_banner()
+        self._apply_licence_gates()
 
     def _open_lexicon(self) -> None:
         LexiconDialog(self).exec()
@@ -410,7 +634,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._set_running(True)
         self.worker = JobWorker(
             source=source, out_root=out_dir, t_opts=t_opts, p_opts=p_opts,
-            hf_token=t_opts.hf_token, parent=self,
+            hf_token=t_opts.hf_token, llm_key=hfsecrets.load_llm_key(), parent=self,
         )
         self.worker.progressed.connect(self._on_progress)
         self.worker.logged.connect(self._append)

@@ -29,3 +29,6 @@ Thumbs.db
 
 # vendored models (fetched by scripts/setup_models.sh)
 models/
+
+# marketing assets (screenshots regenerable from render_shots.py)
+# keep tracked — small, and they are the store listing images

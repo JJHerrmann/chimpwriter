@@ -111,8 +111,12 @@ STT  ->  lexicon fixes  ->  LLM cleanup  ->  final transcript
 ```
 
 Any OpenAI-compatible endpoint — Ollama (`http://localhost:11434/v1`, the
-default), llama.cpp / LM Studio / vLLM, or a hosted API with
-`CHIMPWORKS_LLM_API_KEY`. Off until you set `cleanup_model`.
+default), llama.cpp / LM Studio / vLLM, or a hosted API. Endpoints that want a
+bearer token (LM Studio with auth on, OpenAI, …) read it from
+`CHIMPWORKS_LLM_API_KEY` on the CLI; the GUI has a **Cleanup API key** field in
+**Settings…** that stores it the same way the HF token is stored (OS keyring, or
+`secrets.toml` 0600) and injects it at job start. Off until you set
+`cleanup_model`.
 
 ```bash
 chimpworks transcribe ... --cleanup --cleanup-model qwen2.5:7b-instruct
@@ -124,7 +128,8 @@ re-renders — the loop for tuning the prompt / glossary / model against a known
 transcript. Segments are sent as numbered lines and must return one-for-one; any
 chunk whose reply doesn't line up is left untouched, so a weak model degrades to
 "no change", never to a scrambled transcript. GUI: the **Clean up with LLM**
-checkbox, endpoint + model in **Settings…**.
+checkbox, and endpoint + model + API key in **Settings…** with a **Test** button
+that checks the endpoint is reachable and actually serves the named model.
 
 ## GUI (v1.3 — Chimpwriter)
 

@@ -35,6 +35,7 @@ class JobWorker(QtCore.QThread):
         t_opts: TranscribeOptions,
         p_opts: PacketOptions,
         hf_token: str = "",
+        llm_key: str = "",
         parent: QtCore.QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -43,6 +44,7 @@ class JobWorker(QtCore.QThread):
         self._t_opts = t_opts
         self._p_opts = p_opts
         self._hf_token = hf_token
+        self._llm_key = llm_key
         self._cancel = False
 
     def cancel(self) -> None:
@@ -58,6 +60,8 @@ class JobWorker(QtCore.QThread):
         try:
             if self._hf_token:
                 os.environ["CHIMPWORKS_HF_TOKEN"] = self._hf_token
+            if self._llm_key:
+                os.environ["CHIMPWORKS_LLM_API_KEY"] = self._llm_key
             self.logged.emit(f"Source: {self._source}")
             transcript = build_transcript(self._source, self._t_opts, progress=self._progress)
             n_spk = len({s.speaker for s in transcript.segments if s.speaker})

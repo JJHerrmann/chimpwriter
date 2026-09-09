@@ -9,6 +9,10 @@
 VENV="$HOME/.local/share/chimpworks/venv"
 PY="$VENV/bin/python"
 
+# Secrets (LLM cleanup bearer token, etc.) -- 0600 KEY=VALUE file, git-ignored.
+_env="$HOME/.config/chimpworks/env"
+[ -f "$_env" ] && set -a && . "$_env" && set +a
+
 # ctranslate2 needs the CUDA 12 runtime; torch ships CUDA 13. Point the loader
 # at the pip nvidia-*-cu12 libs or faster-whisper silently drops to CPU.
 _nv="$("$PY" -c 'import os, nvidia; print(os.path.dirname(nvidia.__file__))' 2>/dev/null)"

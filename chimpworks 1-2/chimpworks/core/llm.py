@@ -83,3 +83,28 @@ def reachable(endpoint: str, *, timeout: float = 3.0) -> bool:
             return resp.status == 200
     except Exception:  # noqa: BLE001
         return False
+
+
+def list_models(endpoint: str, *, timeout: float = 5.0) -> list[str]:
+    """Model ids the endpoint advertises (``GET /models``), or ``[]`` on any error.
+
+    Uses ``CHIMPWORKS_LLM_API_KEY`` for auth, same as :func:`chat`. For the GUI
+    'Test' button and model-picker.
+    """
+    if not endpoint:
+        return []
+    url = endpoint.rstrip("/") + "/models"
+    headers = {}
+    if api_key():
+        headers["Authorization"] = f"Bearer {api_key()}"
+    try:
+        with urllib.request.urlopen(
+            urllib.request.Request(url, headers=headers), timeout=timeout
+        ) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except Exception:  # noqa: BLE001
+        return []
+    data = body.get("data") if isinstance(body, dict) else None
+    if not isinstance(data, list):
+        return []
+    return [str(m.get("id")) for m in data if isinstance(m, dict) and m.get("id")]
