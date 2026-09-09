@@ -33,23 +33,24 @@ from .paths import CONFIG_DIR
 LICENCE_DIR = CONFIG_DIR / "licence"
 
 # --- deployment switches ---------------------------------------------------- #
-# The URL of the deployed licensing Worker. Until this points at a real
-# deployment, licensing is considered UNCONFIGURED and enforcement stays off no
-# matter what ENFORCE says (so a dev/self build is never gated).
+# Defaults here are the DEV posture: unconfigured + not enforcing. A packaged
+# release ships a `chimpworks/_build.py` (written by packaging/ at build time)
+# that overrides LICENCE_URL / ENFORCE / TRUSTED_KEYS. `CHIMPWORKS_LICENCE_DEV=1`
+# in the environment always bypasses enforcement regardless.
 _PLACEHOLDER_URL = "https://chimpwriter-licensing.example.workers.dev"
-BASE_URL = os.environ.get("CHIMPWORKS_LICENCE_URL", _PLACEHOLDER_URL)
 
-# Flip to True in the same commit that sets a real BASE_URL to start gating Pro
-# features. `CHIMPWORKS_LICENCE_DEV=1` in the environment always bypasses.
-ENFORCE = False
+try:  # present only in packaged builds
+    from . import _build as _b  # type: ignore
+except Exception:  # noqa: BLE001
+    _b = None  # type: ignore
 
-# kid -> raw ed25519 public key (32 bytes, base64). Populate from `npm run gen-keys`.
-# ADD-ONLY for cert-* kids: a key that has signed any certificate must stay here
-# forever so old certificates keep validating.
-TRUSTED_KEYS: dict[str, str] = {
-    # "lease-2026a": "…base64…",
-    # "cert-2026a":  "…base64…",
-}
+_BUILD_URL = getattr(_b, "LICENCE_URL", "") if _b else ""
+BASE_URL = os.environ.get("CHIMPWORKS_LICENCE_URL") or _BUILD_URL or _PLACEHOLDER_URL
+ENFORCE = bool(getattr(_b, "ENFORCE", False)) if _b else False
+
+# kid -> raw ed25519 public key (32 bytes, base64). ADD-ONLY for cert-* kids:
+# a key that has signed any certificate must stay here forever.
+TRUSTED_KEYS: dict[str, str] = dict(getattr(_b, "TRUSTED_KEYS", {})) if _b else {}
 
 FEATURES = frozenset({"diarize", "cleanup", "packet", "batch"})
 FEATURE_LABELS = {

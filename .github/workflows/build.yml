@@ -1,0 +1,86 @@
+name: Build Chimpwriter
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset: Chimpwriter-linux-x86_64.tar.gz
+          - os: windows-latest
+            asset: Chimpwriter-windows-x86_64.zip
+          - os: macos-latest
+            asset: Chimpwriter-macos-arm64.zip
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install build deps
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "./chimpworks 1-2[gui]" pyinstaller imageio-ffmpeg
+
+      - name: Write build config
+        shell: bash
+        env:
+          CHIMPWRITER_LICENCE_URL: ${{ secrets.CHIMPWRITER_LICENCE_URL }}
+          CHIMPWRITER_ENFORCE: ${{ secrets.CHIMPWRITER_ENFORCE }}
+          CHIMPWRITER_TRUSTED_KEYS: ${{ secrets.CHIMPWRITER_TRUSTED_KEYS }}
+        run: python packaging/write_build_config.py
+
+      - name: PyInstaller
+        shell: bash
+        run: pyinstaller packaging/chimpwriter.spec --noconfirm --log-level WARN
+
+      - name: Selfcheck
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            ./dist/Chimpwriter/Chimpwriter.exe --selfcheck
+          else
+            ./dist/Chimpwriter/Chimpwriter --selfcheck
+          fi
+
+      - name: Trim never-used encoders (PyAV ships a full ffmpeg)
+        shell: bash
+        run: |
+          find dist/Chimpwriter -type f \( -name 'libx264*' -o -name 'libx265*' -o -name 'libvpx*' -o -name 'libaom*' -o -name 'librav1e*' -o -name 'libSvtAv1*' \) -print -delete || true
+
+      - name: Package
+        shell: bash
+        run: |
+          cd dist
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            tar -czf "../${{ matrix.asset }}" Chimpwriter
+          else
+            7z a -tzip "../${{ matrix.asset }}" Chimpwriter >/dev/null
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          retention-days: 14
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset }}
+          fail_on_unmatched_files: true

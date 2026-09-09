@@ -32,3 +32,6 @@ models/
 
 # marketing assets (screenshots regenerable from render_shots.py)
 # keep tracked — small, and they are the store listing images
+
+# keep the packaging spec (the *.spec rule above is for stray ad-hoc specs)
+!packaging/chimpwriter.spec
