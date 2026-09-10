@@ -8,7 +8,7 @@ version = "1.6.0"
 description = "Local research-assistant: video/audio -> structured transcript + citable research packet. v1.3 adds the Chimpwriter GUI."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { text = "Proprietary — source-available; see LICENSE at the repo root" }
 # Floors only. For a reproducible install use the pinned set:
 #   pip install -r requirements.lock -e .
 # (requirements.lock is `pip freeze` of a known-good venv -- Python 3.14 / CUDA.)

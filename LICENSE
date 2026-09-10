@@ -1,0 +1,35 @@
+Chimpwriter Source-Available Licence
+Copyright (c) 2026 Jacob Herrmann, doing business as Rook Works
+
+The source code for Chimpwriter is published for transparency and so that
+anyone who runs it can see exactly what it does. It is NOT open source.
+All rights are reserved except those granted below.
+
+1. You MAY:
+   - view and download this source code;
+   - compile it and run the resulting build for your own personal use or the
+     internal use of your business or organisation;
+   - modify it for that same personal or internal use.
+
+2. You MAY NOT, without a separate written agreement with Rook Works:
+   - redistribute this source code, or any build derived from it (modified or
+     not), to any third party;
+   - sell, rent, sublicense, publish, or offer Chimpwriter or any derivative
+     of it as a product or a service;
+   - remove, disable, or circumvent the licence-enforcement mechanism, or use
+     features that require a paid licence without holding a valid one;
+   - use the name "Chimpwriter", the name "Rook Works", or the project's logos
+     or branding for anything other than accurately referring to this project.
+
+3. The Pro features, licence keys, signed licence certificates, and the hosted
+   licensing service are proprietary. Their use is governed by the Terms of
+   Service at https://chimpwriter.rook.works/terms, not by this licence.
+
+4. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
+   CONNECTION WITH THE SOFTWARE OR ITS USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Licensing requests and questions: chimpwriter@rook.works

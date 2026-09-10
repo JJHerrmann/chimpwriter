@@ -161,3 +161,10 @@ yt-dlp) so the suite runs with no models, no ffmpeg, and no network.
 - **Library**: SQLite + FTS5 index over the `Research/` tree, `chimpworks library search`, content-hash dedup so a re-run of the same video is skipped.
 - **LLM digest**: real summaries/quotes via a local endpoint, behind the existing `Digest` protocol.
 - **GUI polish (post-1.3)**: drag-and-drop / tray from v1-1, batch panel, per-job cancel during model load, packaging (PyInstaller/Briefcase, bundled ffmpeg).
+
+## Licence
+
+Source-available, **not** open source — see [`LICENSE`](../LICENSE) at the repo
+root. You may build and run it for your own use; you may not redistribute or
+resell it, or use the paid features without a licence. Pro terms:
+<https://chimpwriter.rook.works/terms>.
