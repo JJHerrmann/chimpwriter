@@ -13,6 +13,7 @@ from ..core.pipeline import TranscribeOptions
 from ..paths import MODELS_DIR
 from ..render.packet import PacketOptions
 from . import secrets as hfsecrets
+from .citation_dialog import CitationStylesDialog
 from .lexicon_dialog import LexiconDialog
 from .prefs import SPEED_TO_MODEL, GuiPrefs, load_prefs, save_prefs
 from .worker import JobWorker
@@ -20,6 +21,7 @@ from .worker import JobWorker
 VENDORED_DIAR = MODELS_DIR / "pyannote-community-1" / "config.yaml"
 TOKENS_URL = "https://huggingface.co/settings/tokens"
 GATE_URL = "https://huggingface.co/pyannote/speaker-diarization-community-1"
+ICON_PATH = Path(__file__).parent / "assets" / "chimpwriter_icon.png"
 
 
 def _dark_palette(app: QtWidgets.QApplication) -> None:
@@ -456,11 +458,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.diar_check.toggled.connect(self._refresh_token_banner)
         self.cleanup_check = QtWidgets.QCheckBox("Clean up with LLM (fix names / jargon / punctuation)")
         self.article_check = QtWidgets.QCheckBox("Readable article (strip filler)")
-        self.cite_check = QtWidgets.QCheckBox("APA citation")
+        self.cite_check = QtWidgets.QCheckBox("Citation")
         v.addWidget(self.diar_check)
         v.addWidget(self.cleanup_check)
         v.addWidget(self.article_check)
-        v.addWidget(self.cite_check)
+
+        cite_row = QtWidgets.QHBoxLayout()
+        cite_row.addWidget(self.cite_check)
+        self.cite_styles_btn = QtWidgets.QPushButton("Styles…")
+        self.cite_styles_btn.clicked.connect(self._open_citation_styles)
+        cite_row.addWidget(self.cite_styles_btn)
+        cite_row.addStretch(1)
+        v.addLayout(cite_row)
         # checkbox -> (Pro feature it needs, its plain label). cite_check stays free.
         self._pro_checks = {
             self.diar_check: ("diarize", self.diar_check.text()),
@@ -590,6 +599,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def _open_lexicon(self) -> None:
         LexiconDialog(self).exec()
 
+    def _open_citation_styles(self) -> None:
+        dlg = CitationStylesDialog(self, self.prefs.citation_styles)
+        if dlg.exec():
+            self.prefs.citation_styles = dlg.selected_styles()
+            save_prefs(self.prefs)
+
     # -- job lifecycle -----------------------------------------------------
     def _start(self) -> None:
         if self.worker and self.worker.isRunning():
@@ -625,7 +640,7 @@ class MainWindow(QtWidgets.QMainWindow):
             formats=cfg.formats,
             make_article=self.prefs.make_article,
             make_citation=self.prefs.make_citation,
-            citation_style=cfg.citation_style,
+            citation_styles=self.prefs.citation_styles or ["apa"],
             digest=cfg.digest,
         )
 
@@ -691,6 +706,11 @@ class MainWindow(QtWidgets.QMainWindow):
 def main(argv: list[str] | None = None) -> int:
     app = QtWidgets.QApplication(argv if argv is not None else sys.argv)
     app.setApplicationName("Chimpwriter")
+    # Otherwise Wayland/Qt derives the window class from the interpreter
+    # (`python3`), too generic to target with a window manager rule.
+    app.setDesktopFileName("chimpwriter")
+    if ICON_PATH.exists():
+        app.setWindowIcon(QtGui.QIcon(str(ICON_PATH)))
     _dark_palette(app)
     win = MainWindow()
     win.show()

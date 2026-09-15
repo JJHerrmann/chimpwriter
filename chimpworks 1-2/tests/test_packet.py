@@ -24,7 +24,7 @@ class PacketTests(unittest.TestCase):
                 formats=["txt", "srt", "vtt", "json"],
                 make_article=True,
                 make_citation=True,
-                citation_style="apa",
+                citation_styles=["apa"],
                 digest="heuristic",
             )
             written = write_packet(t, d, opts)
@@ -40,7 +40,7 @@ class PacketTests(unittest.TestCase):
                 "_summary.txt",
                 "_quotes.txt",
                 "_citation_apa.txt",
-                "_citation_intext.txt",
+                "_citation_apa_intext.txt",
                 "_citation.bib",
             ):
                 self.assertIn(base + suffix, names, suffix)
@@ -51,6 +51,23 @@ class PacketTests(unittest.TestCase):
 
             # all files landed under Research/<topic>/<source>/
             self.assertTrue(all("Research/Thermodynamics" in str(p) for p in written))
+
+    def test_write_packet_multiple_citation_styles(self):
+        t = sample_transcript()
+        with TemporaryDirectory() as d:
+            opts = PacketOptions(
+                formats=["json"],
+                make_citation=True,
+                citation_styles=["apa", "mla", "chicago"],
+            )
+            written = write_packet(t, d, opts)
+            names = sorted(p.name for p in written)
+            base = safe_name(t.meta.display_name())
+            for style in ("apa", "mla", "chicago"):
+                self.assertIn(f"{base}_citation_{style}.txt", names)
+                self.assertIn(f"{base}_citation_{style}_intext.txt", names)
+            # bibtex is style-independent, written once
+            self.assertEqual(names.count(f"{base}_citation.bib"), 1)
 
     def test_no_speakers_skips_speaker_file(self):
         t = sample_transcript(with_speakers=False)

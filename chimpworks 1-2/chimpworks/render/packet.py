@@ -34,7 +34,7 @@ class PacketOptions:
     formats: list[str] = field(default_factory=lambda: ["txt", "srt", "vtt", "json"])
     make_article: bool = False
     make_citation: bool = True
-    citation_style: str = "apa"
+    citation_styles: list[str] = field(default_factory=lambda: ["apa"])
     digest: str = "heuristic"
 
 
@@ -102,11 +102,12 @@ def write_packet(transcript: Transcript, root: str | Path, opts: PacketOptions) 
                 "".join(f"- {q.timecode()} {q.text}\n" for q in quotes),
             )
 
-    # 4. citations
+    # 4. citations - one reference + in-text file per requested style, one shared .bib
     if opts.make_citation:
-        parts = cite.render_all(transcript.meta, opts.citation_style)
-        emit(f"_citation_{opts.citation_style}.txt", parts["reference"].strip() + "\n")
-        emit("_citation_intext.txt", parts["in_text"].strip() + "\n")
-        emit("_citation.bib", parts["bibtex"])
+        for style in opts.citation_styles or ["apa"]:
+            parts = cite.render_all(transcript.meta, style)
+            emit(f"_citation_{style}.txt", parts["reference"].strip() + "\n")
+            emit(f"_citation_{style}_intext.txt", parts["in_text"].strip() + "\n")
+        emit("_citation.bib", cite.bibtex(transcript.meta))
 
     return written

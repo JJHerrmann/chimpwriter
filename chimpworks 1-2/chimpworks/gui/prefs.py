@@ -7,7 +7,7 @@ window plus the diarization model path.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 from ..config import load_config
 from ..paths import CONFIG_DIR
@@ -28,6 +28,7 @@ class GuiPrefs:
     diarize: bool = False
     make_article: bool = False
     make_citation: bool = True
+    citation_styles: list[str] = field(default_factory=lambda: ["apa"])
     diarize_model: str = "pyannote/speaker-diarization-3.1"
     cleanup: bool = False
     cleanup_endpoint: str = "http://localhost:11434/v1"
@@ -48,6 +49,7 @@ def load_prefs() -> GuiPrefs:
         diarize=cfg.diarize,
         make_article=cfg.make_article,
         make_citation=cfg.make_citation,
+        citation_styles=[cfg.citation_style],
         diarize_model=cfg.diarize_model,
         cleanup=cfg.cleanup,
         cleanup_endpoint=cfg.cleanup_endpoint,

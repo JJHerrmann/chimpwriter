@@ -42,7 +42,7 @@ def _packet_opts(args, cfg) -> PacketOptions:
         formats=[f.strip() for f in formats if f.strip()],
         make_article=args.article or cfg.make_article,
         make_citation=not args.no_citation and cfg.make_citation,
-        citation_style=args.citation_style or cfg.citation_style,
+        citation_styles=[args.citation_style or cfg.citation_style],
         digest=args.digest or cfg.digest,
     )
 
