@@ -10,8 +10,11 @@ APP = "Chimpwriter"
 ROOT = os.path.abspath(os.getcwd())
 SRC = os.path.join(ROOT, "chimpworks 1-2")
 LAUNCH = os.path.join(ROOT, "packaging", "chimpwriter_launch.py")
+ICON_DIR = os.path.join(SRC, "chimpworks", "gui", "assets")
+ICON_ICO = os.path.join(ICON_DIR, "chimpwriter_icon.ico")
 
 datas, binaries, hiddenimports = [], [], []
+datas += [(ICON_DIR, os.path.join("chimpworks", "gui", "assets"))]
 for pkg in (
     "faster_whisper", "ctranslate2", "av", "onnxruntime", "tokenizers",
     "huggingface_hub", "yt_dlp", "keyring", "imageio_ffmpeg",
@@ -74,6 +77,7 @@ exe = EXE(
     strip=_STRIP,
     upx=False,
     console=False,
+    icon=ICON_ICO,
 )
 
 coll = COLLECT(
