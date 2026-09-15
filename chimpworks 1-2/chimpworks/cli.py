@@ -13,7 +13,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import __version__
+from . import __version__, licensing
 from .config import hf_token, load_config, resolve_model, with_overrides
 from .core import asr, audio
 from .core import diarize as diar
@@ -92,6 +92,7 @@ def cmd_transcribe(args) -> int:
 
 
 def cmd_batch(args) -> int:
+    licensing.require("batch")
     cfg = load_config(args.config)
     out_root = Path(args.out).expanduser() if args.out else cfg.resolved_output_dir()
     t_opts, p_opts = _transcribe_opts(args, cfg), _packet_opts(args, cfg)

@@ -13,6 +13,7 @@ from ..core.pipeline import TranscribeOptions
 from ..paths import MODELS_DIR
 from ..render.packet import PacketOptions
 from . import secrets as hfsecrets
+from .batch_dialog import BatchDialog
 from .citation_dialog import CitationStylesDialog
 from .lexicon_dialog import LexiconDialog
 from .prefs import SPEED_TO_MODEL, GuiPrefs, load_prefs, save_prefs
@@ -492,12 +493,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stop_btn = QtWidgets.QPushButton("Stop")
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self._stop)
+        self.batch_btn = QtWidgets.QPushButton("Batch…")
+        self.batch_btn.clicked.connect(self._open_batch)
         terms_btn = QtWidgets.QPushButton("Terminology…")
         terms_btn.clicked.connect(self._open_lexicon)
         gear = QtWidgets.QPushButton("Settings…")
         gear.clicked.connect(self._open_settings)
         btnrow.addWidget(self.go_btn)
         btnrow.addWidget(self.stop_btn)
+        btnrow.addWidget(self.batch_btn)
         btnrow.addStretch(1)
         btnrow.addWidget(terms_btn)
         btnrow.addWidget(gear)
@@ -557,7 +561,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # -- licence gating -------------------------------------------------
     def _apply_licence_gates(self) -> None:
-        """Disable Pro checkboxes when enforcement is on and the feature is locked."""
+        """Disable Pro checkboxes/buttons when enforcement is on and the feature is locked."""
         licensing.cached.cache_clear()
         for check, (feature, base) in self._pro_checks.items():
             if licensing.enforcing() and not licensing.has(feature):
@@ -569,6 +573,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 check.setEnabled(True)
                 check.setText(base)
                 check.setToolTip("")
+
+        batch_locked = licensing.enforcing() and not licensing.has("batch")
+        self.batch_btn.setEnabled(not batch_locked)
+        self.batch_btn.setText("Batch…  — Pro" if batch_locked else "Batch…")
+        self.batch_btn.setToolTip(
+            "Add a Chimpwriter Pro licence in Settings → Licence." if batch_locked else ""
+        )
 
     def _licence_startup_refresh(self) -> None:
         if not licensing.configured():
@@ -606,19 +617,10 @@ class MainWindow(QtWidgets.QMainWindow):
             save_prefs(self.prefs)
 
     # -- job lifecycle -----------------------------------------------------
-    def _start(self) -> None:
-        if self.worker and self.worker.isRunning():
-            return
-        source = self.source_edit.text().strip()
-        if not source:
-            self._append("No source given.")
-            return
-        out_dir = self.out_edit.text().strip()
-        if not out_dir:
-            self._append("Choose an output folder.")
-            return
+    def _build_job_options(self) -> tuple[TranscribeOptions, PacketOptions]:
+        """T/PacketOptions from the settings currently on the main window -
+        shared by the single-source run and the batch queue dialog."""
         self._collect_prefs()
-
         cfg = load_config()
         t_opts = TranscribeOptions(
             model=resolve_model(self.prefs.model),
@@ -643,6 +645,20 @@ class MainWindow(QtWidgets.QMainWindow):
             citation_styles=self.prefs.citation_styles or ["apa"],
             digest=cfg.digest,
         )
+        return t_opts, p_opts
+
+    def _start(self) -> None:
+        if self.worker and self.worker.isRunning():
+            return
+        source = self.source_edit.text().strip()
+        if not source:
+            self._append("No source given.")
+            return
+        out_dir = self.out_edit.text().strip()
+        if not out_dir:
+            self._append("Choose an output folder.")
+            return
+        t_opts, p_opts = self._build_job_options()
 
         self.log.clear()
         self.progress.setValue(0)
@@ -656,6 +672,21 @@ class MainWindow(QtWidgets.QMainWindow):
         self.worker.finished_ok.connect(self._on_ok)
         self.worker.failed.connect(self._on_fail)
         self.worker.start()
+
+    def _open_batch(self) -> None:
+        out_dir = self.out_edit.text().strip()
+        if not out_dir:
+            self._append("Choose an output folder.")
+            return
+        t_opts, p_opts = self._build_job_options()
+        BatchDialog(
+            self,
+            t_opts=t_opts,
+            p_opts=p_opts,
+            out_root=out_dir,
+            hf_token=t_opts.hf_token,
+            llm_key=hfsecrets.load_llm_key(),
+        ).exec()
 
     def _stop(self) -> None:
         if self.worker and self.worker.isRunning():
